@@ -1,0 +1,280 @@
+import { test, expect, capturescreenshot } from '../../utils/baseTest';
+import {
+    getArrivalDate,
+    getDepartureDate,
+    getDateOfBirth,
+    getPassportIssueDate,
+} from '../../utils/date';
+import fs from 'fs';
+import path from 'path';
+
+test('Mexico Visa Application', async ({ page, waitForCaptcha }) => {
+
+    // ── Captcha listener before nav ──
+
+    const captchaPromise = waitForCaptcha(page);
+
+
+    // ── Open application page directly ──
+
+    await page.goto('https://mexico-e-visa.com/apply/ ');
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 5000 });
+    } catch {
+        console.log('Network never went idle, continuing anyway');
+    }
+  await page.getByRole('textbox', { name: 'name' }).click();
+  await page.getByRole('textbox', { name: 'name' }).fill('Rupesh kumar');
+  await page.getByRole('textbox', { name: 'email' }).click();
+  await page.getByRole('textbox', { name: 'email' }).fill('dm443790@gmail.com');
+  await page.getByRole('combobox', { name: 'Selected country' }).click();
+  await page.getByRole('combobox', { name: 'Search' }).fill('indi');
+  await page.getByRole('option', { name: 'India +' }).click();
+  await page.getByRole('textbox', { name: 'phone' }).fill('1234 567 890');
+  const arrival = getArrivalDate();
+    const departure = getDepartureDate();
+
+    // Date of Arrival
+    await page.locator('#day_arrival').selectOption(arrival.day);
+    await page.locator('#mon_arrival').selectOption(arrival.month);
+    await page.locator('#yr_arrival').selectOption(arrival.year);
+
+    // Date of Departure
+    await page.locator('#day_departure').selectOption(departure.day);
+    await page.locator('#mon_departure').selectOption(departure.month);
+    await page.locator('#yr_departure').selectOption(departure.year);
+        await page.getByLabel('Select your nationality').selectOption('45');
+         const captchaText = await captchaPromise;
+    console.log('Decoded CAPTCHA:', captchaText);
+
+    await page.getByRole('textbox', { name: 'Captcha' })
+        .fill(captchaText);
+           await page.waitForTimeout(1000);
+    await capturescreenshot(page, 'registration-page');
+    await page.waitForTimeout(2000);
+    await page.getByRole('button', { name: 'Register' })
+        .click();
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 5000 });
+    } catch {
+        console.log('Network never went idle, continuing anyway');
+    }
+    await page.waitForTimeout(2000);
+
+      
+    await page.getByRole('textbox', { name: 'Name as per Passport', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name as per Passport', exact: true }).fill('rupesh');
+  await page.getByRole('textbox', { name: 'Surname as per Passport' }).click();
+  await page.getByRole('textbox', { name: 'Surname as per Passport' }).fill('kumar');
+      // Date of Birth (Auto-calculated: 25 years old)
+    const dob = getDateOfBirth();
+    await page.locator('#yr_dob_0')
+        .selectOption(dob.year);
+    await page.locator('#mon_dob_0')
+        .selectOption(dob.month);
+    await page.locator('#day_dob_0')
+        .selectOption(dob.day);
+        // Passport Issue Date (Auto-calculated: 5 years ago)
+    const passIssue = getPassportIssueDate();
+    await page.locator('#yr_pass_issue_0')
+        .selectOption(passIssue.year);
+    await page.locator('#mon_pass_issue_0')
+        .selectOption(passIssue.month);
+    await page.locator('#day_pass_issue_0')
+        .selectOption(passIssue.day);
+         await page.locator('#pass_no_0').click();
+  await page.locator('#pass_no_0').fill('111');
+  await page.locator('#country_of_birth_0').selectOption('41');
+  await page.locator('#religion_0').selectOption('JUDAISM');
+  await page.locator('#address_0').click();
+  await page.locator('#address_0').fill('test');
+  await page.locator('#purpose_of_visit_0').selectOption('Recreational Activities');
+  await page.locator('#accomodation_address_0').click();
+  await page.locator('#accomodation_address_0').fill('test');
+ await page.waitForTimeout(1000);
+    await capturescreenshot(page, 'applicant-detail');
+    await page.waitForTimeout(2000);
+    await page.getByRole('button', { name: 'Submit & Preview' })
+        .click();
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 5000 });
+    } catch {
+        console.log('Network never went idle, continuing anyway');
+    }
+await page.waitForTimeout(1000);
+    await capturescreenshot(page, 'preview');
+    await page.waitForTimeout(2000);
+    await page.getByRole('button', { name: 'Submit & Preview' })
+        .click();
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 5000 });
+    } catch {
+        console.log('Network never went idle, continuing anyway');
+    }
+// ── Wait for dynamic upload page to load ──
+
+    await expect(page.locator('[id^="photo_form_"]'))
+        .toBeVisible({ timeout: 15000 });
+
+
+    // ── Resolve upload file path ──
+
+    const uploadCandidates = [
+        path.resolve(__dirname, '..', '..', 'debug-chromium-desktop.png'),
+        path.resolve(process.cwd(), 'debug-chromium-desktop.png'),
+        path.resolve(process.cwd(), 'tests', 'assets', '10kb.jpg'),
+    ];
+
+    const uploadFilePath = uploadCandidates.find(
+        candidate => fs.existsSync(candidate)
+    );
+
+    if (!uploadFilePath) {
+        throw new Error(
+            `No upload file found. Checked: ${uploadCandidates.join(', ')}`
+        );
+    }
+
+
+    // ── Upload files with validation ──
+
+    const uploadSections = [
+        'photo_form_',
+        'passport_form_'
+    ];
+
+    for (const section of uploadSections) {
+        const sectionLocator = page.locator(`[id^="${section}"]`);
+
+        await sectionLocator
+            .locator('input[type="file"]')
+            .setInputFiles(uploadFilePath);
+
+        await expect(sectionLocator)
+            .toContainText('Uploaded', { timeout: 15000 });
+
+        console.log(`Uploaded: ${section.replace(/_/g, ' ')}`);
+    }
+  // ── Save & Continue ──
+
+    await page.waitForTimeout(1000);
+    await capturescreenshot(page, 'doc-page');
+    await page.getByRole('button', { name: 'Save & Continue' })
+        .click();
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 5000 });
+    } catch {
+        console.log('Network never went idle, continuing anyway');
+    }
+
+
+    // ── Final assertions ──
+
+    await expect(
+        page.getByRole('heading', { name: 'Pay Application Processing Fee' })
+    ).toBeVisible({ timeout: 30000 });
+
+    await page.waitForTimeout(1000);
+    await capturescreenshot(page, 'payment-page');
+
+    await expect(
+        page.getByText('dm443790@gmail.com')
+    ).toBeVisible();
+
+
+    // ── Payment URL auto-captured by baseTest afterEach ──
+
+    console.log(
+        `\n================ PAYMENT PAGE URL ================\n` +
+        `${page.url()}\n` +
+        `====================================================\n`
+    );
+
+
+
+
+    // =====================================
+    // EXTRACT TEMPORARY ORDER ID
+    // =====================================
+
+    const orderId = await page.locator('#app_of').textContent();
+    const trimmedOrderId = orderId?.trim() || '';
+    console.log(`\n================ TEMPORARY ORDER ID ================\n${trimmedOrderId}\n====================================================\n`);
+
+    expect(trimmedOrderId).toBeTruthy();
+
+
+    // =====================================
+    // VISA STATUS PAGE — PASTE ORDER ID
+    // =====================================
+ await page.waitForTimeout(3000);
+    // New captcha listener for the visa-status page (new page load = new captcha)
+    const statusCaptchaPromise = waitForCaptcha(page);
+
+    await page.goto('https://mexico-e-visa.com/application-status/');
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 5000 });
+    } catch {
+        console.log('Network never went idle, continuing anyway');
+    }
+
+    await page.getByRole('textbox', { name: 'application_id_status' }).click();
+    await page.getByRole('textbox', { name: 'application_id_status' }).fill(trimmedOrderId);
+
+    await page.getByRole('textbox', { name: 'passport_no_status' }).click();
+    await page.getByRole('textbox', { name: 'passport_no_status' }).fill('111');
+
+    // Wait for the new captcha from the visa-status page
+    const statusCaptcha = await statusCaptchaPromise;
+    console.log('Decoded CAPTCHA (status page):', statusCaptcha);
+
+    await page.getByRole('textbox', { name: 'captcha_code_status' })
+        .fill(statusCaptcha);
+
+    await page.getByRole('button', { name: 'Check Status' }).click();
+    await expect(page.getByText('dm443790@gmail.com')).toBeVisible();
+
+    // Save visa-status page URL for the report
+    process.env.VISA_STATUS_PAGE_URL = page.url();
+    process.env.VISA_STATUS_SCREENSHOT = await capturescreenshot(page, 'visa-status') || '';
+    console.log(`\n================ VISA STATUS PAGE URL ================\n${page.url()}\n====================================================\n`);
+
+
+    // =====================================
+    // COMPLETE PARTIALLY FILLED
+    // =====================================
+ await page.waitForTimeout(3000);
+    // New captcha listener for the complete-partially page
+    const partialCaptchaPromise = waitForCaptcha(page);
+
+    await page.goto('https://mexico-e-visa.com/complete-partially/');
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 5000 });
+    } catch {
+        console.log('Network never went idle, continuing anyway');
+    }
+
+    await page.getByRole('textbox', { name: 'temporary_application_id' }).click();
+    await page.getByRole('textbox', { name: 'temporary_application_id' }).fill(trimmedOrderId);
+
+    // Wait for the captcha from the complete-partially page
+    const partialCaptcha = await partialCaptchaPromise;
+    console.log('Decoded CAPTCHA (complete-partially page):', partialCaptcha);
+
+    await page.getByRole('textbox', { name: 'captcha_code' })
+        .fill(partialCaptcha);
+
+    await page.getByRole('button', { name: 'Complete Partially Filled' }).click();
+
+    // Wait for navigation to the final URL (payment page or application page)
+    await page.waitForURL(/(visa-payment|apply\/\?a=edit)/, { timeout: 30000 });
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 5000 });
+    } catch {
+        console.log('Network never went idle, continuing anyway');
+    }
+
+    // Save the final URL for the report
+    process.env.COMPLETE_PARTIALLY_URL = page.url();
+    console.log(`\n================ COMPLETE PARTIALLY URL ================\n${page.url()}\n====================================================\n`);
+});
